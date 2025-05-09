@@ -7,8 +7,8 @@ TILE_SIZE = 32
 
 MENU = 0
 PLAYING = 1
-game_state = MENU
 
+game_state = MENU
 sound = True
 
 
@@ -207,6 +207,64 @@ class TileMap:
         if 0 <= row < self.rows and 0 <= col < self.cols:
             return self.map[row][col] == 0 
 
+def play_music(track):
+    if sound:
+        music.stop()
+        music.play(track)
+    else:
+        music.stop()
+
+def update_music():
+    if game_state == MENU:
+        play_music("menu")
+    else:
+        play_music("background")
+
+start_button = Rect(WIDTH//2 - 100, HEIGHT//2 - 50, 200, 50)
+sound_button = Rect(WIDTH//2 - 100, HEIGHT//2 + 20, 200, 50)
+exit_button = Rect(WIDTH//2 - 100, HEIGHT//2 + 90, 200, 50)
+
+def draw_menu():
+    screen.clear()
+    screen.fill((30, 30, 50))  # Cor de fundo
+    
+    # Título do jogo
+    screen.draw.text(
+        "URBIS",
+        center=(WIDTH//2, HEIGHT//4),
+        fontsize=60,
+        color=(255, 255, 255)
+    )
+    
+    # Botão Começar
+    screen.draw.filled_rect(start_button, (70, 130, 80))
+    screen.draw.text(
+        "Iniciar",
+        center=start_button.center,
+        fontsize=30,
+        color=(255, 255, 255)
+    )
+    
+
+    sound_color = (100, 200, 100) if sound else (200, 100, 100)
+    screen.draw.filled_rect(sound_button, sound_color)
+    sound_text = "Som: LIGADO" if sound else "Som: DESLIGADO"
+    screen.draw.text(
+        sound_text,
+        center=sound_button.center,
+        fontsize=30,
+        color=(255, 255, 255)
+    )
+    
+    # Botão Sair
+    screen.draw.filled_rect(exit_button, (200, 70, 70))
+    screen.draw.text(
+        "Sair",
+        center=exit_button.center,
+        fontsize=30,
+        color=(255, 255, 255)
+    )
+
 tilemap = TileMap(
     rows=HEIGHT//TILE_SIZE,
     cols=WIDTH//TILE_SIZE,
@@ -214,7 +272,7 @@ tilemap = TileMap(
     grass_prob=0.1
 )
 
-
+update_music()
 hero = Hero(WIDTH/2, HEIGHT/2, tilemap=tilemap)
 enemies = [
     Enemy(Rect(100, 100, 50, 50)),
@@ -222,31 +280,55 @@ enemies = [
 ]
 
 def update(dt):
-    dx, dy = 0, 0
-    if keys_pressed["left"]:
-        dx -= 1
-    if keys_pressed["right"]:
-        dx += 1
-    if keys_pressed["up"]:
-        dy -= 1
-    if keys_pressed["down"]:
-        dy += 1
-    
-    hero.move(dx, dy)
-    hero.update(dt)
+    if game_state == PLAYING:
+        dx, dy = 0, 0
+        if keys_pressed["left"]:
+            dx -= 1
+        if keys_pressed["right"]:
+            dx += 1
+        if keys_pressed["up"]:
+            dy -= 1
+        if keys_pressed["down"]:
+            dy += 1
+        
+        hero.move(dx, dy)
+        hero.update(dt)
 
-    for enemy in enemies:
-        enemy.update(dt)
+        for enemy in enemies:
+            enemy.update(dt)
 
 def draw():
-    screen.clear()
-    tilemap.draw(screen)
-    hero.draw()
-    for enemy in enemies:
-        enemy.draw()
+    if game_state == MENU:
+        draw_menu()
+    else:
+        screen.clear()
+        tilemap.draw(screen)
+        hero.draw()
+        for enemy in enemies:
+            enemy.draw()
 
-    screen.draw.text(f"Health: {hero.health}", (10, 10), fontsize=16)
+        #screen.draw.text(f"HP: {hero.health}", (10, 10), fontsize=16)
 
+def on_mouse_down(pos):
+    global game_state, sound
+    
+    if game_state == MENU:
+        if start_button.collidepoint(pos):
+            game_state = PLAYING
+            if sound:
+                sounds.start.play()
+                update_music()
+        elif sound_button.collidepoint(pos):
+            sound = not sound
+            if sound:
+                sounds.toggle_on.play()
+                music.unpause()
+            else:
+                sounds.toggle_off.play()
+                music.pause()
+
+        elif exit_button.collidepoint(pos):
+            quit()
 
 def on_key_down(key):
     if key == keys.LEFT:
