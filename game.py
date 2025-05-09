@@ -1,6 +1,8 @@
-WIDTH = 320
-HEIGHT = 160
-TILE_SIZE = 16
+import random
+
+WIDTH = 576
+HEIGHT = 544
+TILE_SIZE = 32
 
 MENU = 0
 PLAYING = 1
@@ -16,9 +18,9 @@ keys_pressed = {
     "down": False
 }
 
-#Classe base de personagem
+#Classe base para representar os personagens do jogo
 class Character:
-    def __init__(self, x, y, sprites, speed=1):
+    def __init__(self, x, y, sprites, speed=1.5, tilemap=None):
         self.x = x
         self.y = y
         self.sprites = sprites
@@ -29,6 +31,7 @@ class Character:
         self.speed = speed
         self.direction = "down"
         self.moving = False
+        self.tilemap = tilemap
 
 
     def update(self, dt):
@@ -66,30 +69,108 @@ class Character:
         elif dy < 0:
             self.direction = "up"
         
-        self.x += dx * self.speed
-        self.y += dy * self.speed
+        new_x = self.x + dx * self.speed
+        new_y = self.y + dy * self.speed
+        
+        if self.tilemap is None or self.can_move(new_x, new_y):
+            self.x = new_x
+            self.y = new_y
 
-#Classe do Hero derivada da classe Character
+    def can_move(self, x, y):
+        col, row = self.tilemap.world_to_tile(x, y)
+        return self.tilemap.is_walkable(col, row)
+
+#Classe do Hero derivada da classe Character para representar o protagonista do jogo
 class Hero(Character):
-    def __init__(self, x, y):
+    def __init__(self, x, y, sprites=None, speed=1.5, tilemap=None):
         sprites = {
             "up": [Actor("hero_up_1"), Actor("hero_up_2"), Actor("hero_up_3")],
             "down": [Actor("hero_down_1"), Actor("hero_down_2"), Actor("hero_down_3")],
             "left": [Actor("hero_left_1"), Actor("hero_left_2"), Actor("hero_left_3")],
             "right": [Actor("hero_right_1"), Actor("hero_right_2"), Actor("hero_right_3")]
         }
-        super().__init__(x, y, sprites)
+        super().__init__(x, y, sprites, tilemap=tilemap)
         self.health = 100
 
     def update(self, dt):
         super().update(dt)
 
+#Classe do Tilemap para representar o mapa do jogo
+class TileMap:
+    def __init__(self, rows=17, cols=18, tile_size=32, grass_prob=0.15):
+        self.rows = rows
+        self.cols = cols
+        self.tile_size = tile_size
+        self.grass_prob = grass_prob
+        self.tile_images = {
+            0: "land",
+            1: "grass",   
+        }
+        self.map = []
+        self.generate_map()
+    
+    def generate_map(self, ensure_path=True):
+        self.map = []
+        
+        for row in range(self.rows):
+            current_row = []
+            for col in range(self.cols):
+                if row == 0 or row == self.rows-1 or col == 0 or col == self.cols-1:
+                    current_row.append(1)
+                else:
+                    current_row.append(1 if random.random() < self.grass_prob else 0)
+            self.map.append(current_row)
+        
+        if ensure_path:
+            self._ensure_central_path()
+    
+    def _ensure_central_path(self):
+        middle_row = self.rows // 2
+        middle_col = self.cols // 2
+        
+        for col in range(1, self.cols-1):
+            self.map[middle_row][col] = 0
+            self.map[middle_row-1][col] = 0
+        
+        for row in range(1, self.rows-1):
+            self.map[row][middle_col] = 0
+            self.map[row][middle_col-1] = 0
+    
+    def draw(self, screen, offset_x=0, offset_y=0):
+        start_col = max(0, offset_x // self.tile_size)
+        start_row = max(0, offset_y // self.tile_size)
+        end_col = min(self.cols, (offset_x + WIDTH) // self.tile_size + 1)
+        end_row = min(self.rows, (offset_y + HEIGHT) // self.tile_size + 1)
+        
+        for row in range(0, self.rows):
+            for col in range(0, self.cols):
+                tile_type = self.map[row][col]
+                if tile_type in self.tile_images:
+                    image_name = self.tile_images[tile_type]
+                    screen.blit(image_name,
+                                (col * self.tile_size - offset_x, 
+                                 row * self.tile_size - offset_y)
+                    )
+    def world_to_tile(self, x, y):
+        return (
+            int(x // self.tile_size),
+            int(y // self.tile_size)
+        )
+    def is_walkable(self, col, row):
+        if 0 <= row < self.rows and 0 <= col < self.cols:
+            return self.map[row][col] == 0 
 
-hero = Hero(WIDTH/2, HEIGHT/2)
+tilemap = TileMap(
+    rows=HEIGHT/TILE_SIZE,
+    cols=WIDTH/TILE_SIZE,
+    tile_size=TILE_SIZE,
+    grass_prob=0.15
+)
+
+
+hero = Hero(WIDTH/2, HEIGHT/2, tilemap=tilemap)
 
 def update(dt):
-    hero.update(dt)
-
     dx, dy = 0, 0
     if keys_pressed["left"]:
         dx -= 1
@@ -101,17 +182,11 @@ def update(dt):
         dy += 1
     
     hero.move(dx, dy)
+    hero.update(dt)
 
 def draw():
     screen.clear()
-    
-    screen.draw.filled_rect(Rect(0, 0, WIDTH, HEIGHT), (20, 20, 30))
-    
-    for x in range(0, WIDTH, TILE_SIZE):
-        screen.draw.line((x, 0), (x, HEIGHT), (40, 40, 40))
-    for y in range(0, HEIGHT, TILE_SIZE):
-        screen.draw.line((0, y), (WIDTH, y), (40, 40, 40))
-    
+    tilemap.draw(screen)
     hero.draw()
     
     screen.draw.text(f"Health: {hero.health}", (10, 10), fontsize=16)
