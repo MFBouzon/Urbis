@@ -1,4 +1,5 @@
 import random
+import math
 
 WIDTH = 576
 HEIGHT = 544
@@ -9,6 +10,7 @@ PLAYING = 1
 game_state = MENU
 
 sound = True
+
 
 #Controle de teclas pressionadas
 keys_pressed = {
@@ -72,7 +74,7 @@ class Character:
         new_x = self.x + dx * self.speed
         new_y = self.y + dy * self.speed
         
-        if self.tilemap is None or self.can_move(new_x, new_y):
+        if self.tilemap is None or self.can_move(new_x, new_y+7):
             self.x = new_x
             self.y = new_y
 
@@ -94,6 +96,51 @@ class Hero(Character):
 
     def update(self, dt):
         super().update(dt)
+
+
+
+class Enemy(Character):
+    def __init__(self, patrol_area):
+        self.patrol_area = patrol_area  # Rect
+        sprites = {
+            "up": [Actor("enemy1_up_1"), Actor("enemy1_up_2"), Actor("enemy1_up_3")],
+            "down": [Actor("enemy1_down_1"), Actor("enemy1_down_2"), Actor("enemy1_down_3")],
+            "left": [Actor("enemy1_left_1"), Actor("enemy1_left_2"), Actor("enemy1_left_3")],
+            "right": [Actor("enemy1_right_1"), Actor("enemy1_right_2"), Actor("enemy1_right_3")]
+        }
+
+        super().__init__(self.patrol_area.left, self.patrol_area.top, sprites, speed=1)
+        self.targets= [
+            (self.patrol_area.right, self.patrol_area.top),   
+            (self.patrol_area.right, self.patrol_area.bottom), 
+            (self.patrol_area.left, self.patrol_area.bottom), 
+            (self.patrol_area.left, self.patrol_area.top)
+        ]
+        print(self.targets)
+        self.current_target = 0  
+        self.target_x, self.target_y = self.targets[self.current_target]
+
+    def update(self, dt):
+        super().update(dt)
+        
+        if math.dist((self.x, self.y), (self.target_x, self.target_y)) == 0:
+            self.current_target = (self.current_target + 1) % 4
+            self.target_x, self.target_y = self.targets[self.current_target]
+        
+        dx = 0
+        dy = 0
+        if abs(self.x - self.target_x) > 0:
+            if self.target_x > self.x:
+                dx = 1  
+            else: 
+                dx = -1
+        if abs(self.y - self.target_y) > 0:
+            if self.target_y > self.y:
+                dy = 1  
+            else: 
+                dy = -1
+        
+        self.move(dx, dy)
 
 #Classe do Tilemap para representar o mapa do jogo
 class TileMap:
@@ -161,14 +208,18 @@ class TileMap:
             return self.map[row][col] == 0 
 
 tilemap = TileMap(
-    rows=HEIGHT/TILE_SIZE,
-    cols=WIDTH/TILE_SIZE,
+    rows=HEIGHT//TILE_SIZE,
+    cols=WIDTH//TILE_SIZE,
     tile_size=TILE_SIZE,
-    grass_prob=0.15
+    grass_prob=0.1
 )
 
 
 hero = Hero(WIDTH/2, HEIGHT/2, tilemap=tilemap)
+enemies = [
+    Enemy(Rect(100, 100, 50, 50)),
+    Enemy(Rect(350, 350, 25, 25))
+]
 
 def update(dt):
     dx, dy = 0, 0
@@ -184,11 +235,16 @@ def update(dt):
     hero.move(dx, dy)
     hero.update(dt)
 
+    for enemy in enemies:
+        enemy.update(dt)
+
 def draw():
     screen.clear()
     tilemap.draw(screen)
     hero.draw()
-    
+    for enemy in enemies:
+        enemy.draw()
+
     screen.draw.text(f"Health: {hero.health}", (10, 10), fontsize=16)
 
 
