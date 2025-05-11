@@ -170,7 +170,7 @@ class TileMap:
         self.map = []
         self.generate_map()
     
-    def generate_map(self, ensure_path=True):
+    def generate_map(self):
         self.map = []
         
         for row in range(self.rows):
@@ -182,21 +182,7 @@ class TileMap:
                     current_row.append(1 if random.random() < self.grass_prob else 0)
             self.map.append(current_row)
         
-        if ensure_path:
-            self._ensure_central_path()
-    
-    def _ensure_central_path(self):
-        middle_row = self.rows // 2
-        middle_col = self.cols // 2
         
-        for col in range(1, self.cols-1):
-            self.map[middle_row][col] = 0
-            self.map[middle_row-1][col] = 0
-        
-        for row in range(1, self.rows-1):
-            self.map[row][middle_col] = 0
-            self.map[row][middle_col-1] = 0
-    
     def draw(self, screen, offset_x=0, offset_y=0):
         start_col = max(0, offset_x // self.tile_size)
         start_row = max(0, offset_y // self.tile_size)
@@ -385,6 +371,7 @@ def update(dt):
                     game_state = VICTORY
                     update_music()
 
+
 def draw():
     if game_state == MENU:
         draw_menu()
@@ -400,7 +387,7 @@ def draw():
     elif game_state == VICTORY:
         draw_victory()
 
-
+#interação com o click do mouse
 def on_mouse_down(pos):
     global game_state, sound
     
@@ -426,9 +413,11 @@ def on_mouse_down(pos):
 
     elif game_state == GAME_OVER or game_state == VICTORY:
         if start_button.collidepoint(pos):
-            sounds.start.play()
+            if sound:
+                sounds.start.play()
             reset_game()
 
+#interação com o teclado
 def on_key_down(key):
     if key == keys.LEFT:
         keys_pressed["left"] = True
