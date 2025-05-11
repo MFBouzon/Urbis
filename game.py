@@ -7,10 +7,10 @@ TILE_SIZE = 32
 
 MENU = 0
 PLAYING = 1
+GAME_OVER = 2
+VICTORY = 3
 
-game_state = MENU
-sound = True
-
+items_collected = 0
 
 #Controle de teclas pressionadas
 keys_pressed = {
@@ -97,16 +97,21 @@ class Hero(Character):
     def update(self, dt):
         super().update(dt)
 
+    def move(self, dx, dy):
+        moving_now = dx != 0 or dy != 0
+        super().move(dx, dy)
+            
 
 
+#Classe do inimigo derivada da classe Character
 class Enemy(Character):
     def __init__(self, patrol_area):
         self.patrol_area = patrol_area  # Rect
         sprites = {
-            "up": [Actor("enemy1_up_1"), Actor("enemy1_up_2"), Actor("enemy1_up_3")],
-            "down": [Actor("enemy1_down_1"), Actor("enemy1_down_2"), Actor("enemy1_down_3")],
-            "left": [Actor("enemy1_left_1"), Actor("enemy1_left_2"), Actor("enemy1_left_3")],
-            "right": [Actor("enemy1_right_1"), Actor("enemy1_right_2"), Actor("enemy1_right_3")]
+            "up": [Actor("enemy2_up_1"), Actor("enemy2_up_2"), Actor("enemy2_up_3")],
+            "down": [Actor("enemy2_down_1"), Actor("enemy2_down_2"), Actor("enemy2_down_3")],
+            "left": [Actor("enemy2_left_1"), Actor("enemy2_left_2"), Actor("enemy2_left_3")],
+            "right": [Actor("enemy2_right_1"), Actor("enemy2_right_2"), Actor("enemy2_right_3")]
         }
 
         super().__init__(self.patrol_area.left, self.patrol_area.top, sprites, speed=1)
@@ -119,6 +124,10 @@ class Enemy(Character):
         print(self.targets)
         self.current_target = 0  
         self.target_x, self.target_y = self.targets[self.current_target]
+        self.item = Actor("item", 
+                         center=(self.patrol_area.centerx, 
+                                self.patrol_area.centery))
+        self.item_collected = False
 
     def update(self, dt):
         super().update(dt)
@@ -141,6 +150,11 @@ class Enemy(Character):
                 dy = -1
         
         self.move(dx, dy)
+
+    def draw(self):
+        super().draw()
+        if not self.item_collected:
+            self.item.draw()
 
 #Classe do Tilemap para representar o mapa do jogo
 class TileMap:
@@ -198,11 +212,13 @@ class TileMap:
                                 (col * self.tile_size - offset_x, 
                                  row * self.tile_size - offset_y)
                     )
+
     def world_to_tile(self, x, y):
         return (
             int(x // self.tile_size),
             int(y // self.tile_size)
         )
+    
     def is_walkable(self, col, row):
         if 0 <= row < self.rows and 0 <= col < self.cols:
             return self.map[row][col] == 0 
@@ -217,27 +233,21 @@ def play_music(track):
 def update_music():
     if game_state == MENU:
         play_music("menu")
-    else:
+    elif game_state == PLAYING:
         play_music("background")
-
-start_button = Rect(WIDTH//2 - 100, HEIGHT//2 - 50, 200, 50)
-sound_button = Rect(WIDTH//2 - 100, HEIGHT//2 + 20, 200, 50)
-exit_button = Rect(WIDTH//2 - 100, HEIGHT//2 + 90, 200, 50)
+    elif game_state == GAME_OVER:
+        play_music("game_over")
+    elif game_state == VICTORY:
+        play_music("victory")    
 
 def draw_menu():
     screen.clear()
-    screen.fill((30, 30, 50))  # Cor de fundo
+    screen.fill((30, 30, 50))
     
-    # Título do jogo
-    screen.draw.text(
-        "URBIS",
-        center=(WIDTH//2, HEIGHT//4),
-        fontsize=60,
-        color=(255, 255, 255)
-    )
+    logo = Actor("logo", center=(WIDTH//2, HEIGHT//5))
+    logo.draw()
     
-    # Botão Começar
-    screen.draw.filled_rect(start_button, (70, 130, 80))
+    screen.draw.filled_rect(start_button, (0, 200, 200))
     screen.draw.text(
         "Iniciar",
         center=start_button.center,
@@ -246,7 +256,7 @@ def draw_menu():
     )
     
 
-    sound_color = (100, 200, 100) if sound else (200, 100, 100)
+    sound_color = (0, 150, 220) if sound else (80, 85, 90)
     screen.draw.filled_rect(sound_button, sound_color)
     sound_text = "Som: LIGADO" if sound else "Som: DESLIGADO"
     screen.draw.text(
@@ -256,30 +266,92 @@ def draw_menu():
         color=(255, 255, 255)
     )
     
-    # Botão Sair
-    screen.draw.filled_rect(exit_button, (200, 70, 70))
+    screen.draw.filled_rect(exit_button, (50, 50, 50))
     screen.draw.text(
         "Sair",
         center=exit_button.center,
         fontsize=30,
         color=(255, 255, 255)
     )
+    
+    
+    screen.draw.line(
+        (WIDTH//4, HEIGHT//3 + 10), 
+        (3*WIDTH//4, HEIGHT//3 + 10), 
+        (80, 80, 80, 100)
+    )
+
+def draw_game_over():
+    screen.clear()
+    screen.fill((20, 20, 30))
+    
+    screen.draw.text(
+        "DERROTA",
+        center=(WIDTH//2, HEIGHT//3),
+        fontsize=72,
+        color=(200, 50, 50)
+    )
+    
+    screen.draw.filled_rect(start_button, (70, 130, 80))
+    screen.draw.text(
+        "Voltar ao Menu",
+        center=start_button.center,
+        fontsize=30,
+        color=(255, 255, 255)
+    )
+
+def draw_victory():
+    screen.clear()
+    screen.fill((20, 20, 30))
+    
+    screen.draw.text(
+        "SUCESSO!",
+        center=(WIDTH//2, HEIGHT//3),
+        fontsize=72,
+        color=(50, 200, 50)
+    )
+    
+    screen.draw.filled_rect(start_button, (70, 130, 80))
+    screen.draw.text(
+        "Voltar ao Menu",
+        center=start_button.center,
+        fontsize=30,
+        color=(255, 255, 255)
+    )
+
+def reset_game():
+    global game_state, hero, enemies, items_collected
+    
+    game_state = MENU  # Volta para o menu
+    hero = Hero(WIDTH/2, HEIGHT/2, tilemap=tilemap)
+    enemies = [
+        Enemy(Rect(100, 100, 150, 150)),
+        Enemy(Rect(350, 350, 100, 100))
+    ]
+    items_collected = 0
+    update_music()
+
+game_state = MENU
+sound = True
+
+
+start_button = Rect(WIDTH//2 - 100, HEIGHT//2 - 50, 200, 50)
+sound_button = Rect(WIDTH//2 - 100, HEIGHT//2 + 20, 200, 50)
+exit_button = Rect(WIDTH//2 - 100, HEIGHT//2 + 90, 200, 50)
 
 tilemap = TileMap(
     rows=HEIGHT//TILE_SIZE,
     cols=WIDTH//TILE_SIZE,
     tile_size=TILE_SIZE,
-    grass_prob=0.1
+    grass_prob=0.0
 )
 
-update_music()
-hero = Hero(WIDTH/2, HEIGHT/2, tilemap=tilemap)
-enemies = [
-    Enemy(Rect(100, 100, 50, 50)),
-    Enemy(Rect(350, 350, 25, 25))
-]
+reset_game()
+
+total_items = len(enemies)
 
 def update(dt):
+    global game_state, items_collected
     if game_state == PLAYING:
         dx, dy = 0, 0
         if keys_pressed["left"]:
@@ -296,18 +368,38 @@ def update(dt):
 
         for enemy in enemies:
             enemy.update(dt)
+            if math.dist((hero.x, hero.y), (enemy.x, enemy.y)) < 20:
+                game_state = GAME_OVER
+                if sound:
+                    sounds.game_over.play()
+                update_music()
+            
+            if (not enemy.item_collected and 
+                math.dist((hero.x, hero.y), (enemy.item.x, enemy.item.y)) < 20):
+                enemy.item_collected = True
+                items_collected += 1
+                if sound:
+                    sounds.collect.play()
+                
+                if items_collected >= total_items:
+                    game_state = VICTORY
+                    update_music()
 
 def draw():
     if game_state == MENU:
         draw_menu()
-    else:
+    elif game_state == PLAYING:
         screen.clear()
         tilemap.draw(screen)
         hero.draw()
         for enemy in enemies:
             enemy.draw()
+        screen.draw.text(f"Garotas salvas: {items_collected}/{total_items}", (10, 10), fontsize=20)
+    elif game_state == GAME_OVER:
+        draw_game_over()
+    elif game_state == VICTORY:
+        draw_victory()
 
-        #screen.draw.text(f"HP: {hero.health}", (10, 10), fontsize=16)
 
 def on_mouse_down(pos):
     global game_state, sound
@@ -323,12 +415,19 @@ def on_mouse_down(pos):
             if sound:
                 sounds.toggle_on.play()
                 music.unpause()
+                if not music.is_playing("menu"):
+                    update_music()
             else:
                 sounds.toggle_off.play()
                 music.pause()
 
         elif exit_button.collidepoint(pos):
             quit()
+
+    elif game_state == GAME_OVER or game_state == VICTORY:
+        if start_button.collidepoint(pos):
+            sounds.start.play()
+            reset_game()
 
 def on_key_down(key):
     if key == keys.LEFT:
